@@ -1,0 +1,566 @@
+---
+title: "MULTIPLE LINEAR REGRESSION"
+author: "Dr.Muhammad Abdul Hafiz bin Kamarul Zaman, Dr Omar bin Nazmi, Dr Muhammad Za'im bin Mohd Samsuri, Dr Syuaib Aiman Amir bin Kamarudin"
+date: 31st December 2024
+format: 
+  html:
+    toc: true
+    toc-title: Contents
+    toc-location: left
+    toc-depth: 3
+    toc-expand: 1
+    number-sections: true
+    theme:
+        light: united
+        dark: cyborg
+    embed-resources: true
+editor: visual
+---
+
+# Introduction :
+
+## Team Member :
+
+Dr Omar Bin Nazmi
+
+Dr Muhammad Zaim Bin Muhd Samsuri
+
+Dr Mohd Abdul Hafiz Bin Kamarul Zaman
+
+Dr Syuaib Aiman Amir bin Kamarudin
+
+\![Team Members](video.gif) (![](images/Photo.jpeg)
+
+## Datasets
+
+This exercise will use dataset mental health literacy, The dataset belonged to a study on mental health literacy among house officers. The followings are regarding the datasets:
+
+1.  ID : Subject's ID.
+2.  Age : Respondents's Age (Numerical variable)
+3.  Gender : gender (Categorical) , (labelled ; Male, female)
+4.  Current Hospital Posting : (Categorical)
+5.  Duration of employment : ( Numerical)
+6.  Marital Status : (Categorical)
+7.  Previous experiences of being bullied: (Categorical)
+8.  Family members spouse: (Categorical)
+9.  Peers friends: ( Categorical)
+
+Literature review shows Age, female gender, Hospital with good mental support, duration of employment, marital status, previous experiences of being bullied, family member spouse who are supportive, and peerd friends shows better mental health literacy.
+
+# Prepare the Environment
+
+### Install packages
+
+```{r}
+library(tidyverse)
+library(here)
+library(broom)
+library(broom.helpers)
+library(haven)
+library(gtsummary)
+library(dplyr)
+library(corrplot)
+library(knitr)
+library(readxl)
+library(janitor)
+library(skimr)
+library(GGally)
+library(rsq)
+```
+
+### Read Data
+
+```{r}
+data1 <- read_excel("C:/Users/H P/OneDrive - The Goose and Duck/Desktop/mlinear final/Data1.xlsx")
+data1<-clean_names(data1)
+summary(data1)
+glimpse(data1)
+```
+
+### Data exploration
+
+#### Descriptive
+
+```{r}
+data2<-
+  data1 %>% 
+  mutate(across(where(is.character),as.factor))
+```
+
+```{r}
+data2 <- data2 %>%
+  mutate(age = as.numeric(as.character(age)))
+```
+
+```{r}
+data2 <- data2 %>%
+  mutate(age = as.integer(age))
+```
+
+```{r}
+data2 %>% 
+  select(duration_of_employment, current_hospital_posting, previous_experience_of_being_bullied, family_members_spouse, peers_friends, literacy_score)
+```
+
+```{r}
+str(data2)
+```
+
+```{r}
+# Change the reference level for the gender factor
+data2$gender <- relevel(data2$gender, ref = "Male")
+# Check the levels to confirm the change
+levels(data2$gender)
+```
+
+According to the literature review, gender female are better in mental health literacy compared to gender male.
+
+# Descriptive Summary data
+
+```{r}
+data2 %>% 
+  tbl_summary(
+    label = list(
+      duration_of_employment ~ "Duration of employment",
+      age~"Age",
+      current_hospital_posting ~ "Current hospital posting", 
+      previous_experience_of_being_bullied ~ "Previous experience", 
+      family_members_spouse ~ "Family members", 
+      peers_friends ~ "Peers", 
+      literacy_score ~ "Literacy score"
+    ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})"
+    )
+  ) %>% 
+  bold_labels() %>% 
+  italicize_levels()
+```
+
+#### Explore and Wrangle Data
+
+1.  Age
+
+```{r}
+ggplot(data = data2,aes(age))+
+  geom_histogram(fill= "black")
+geom_boxplot()
+
+
+```
+
+2.  Gender
+
+```{r}
+ggplot(data2, aes(x = gender)) + 
+  geom_bar( fill= "black")
+```
+
+3.  Current Hospital Posting
+
+    ```{r}
+    ggplot(data2, aes(x = current_hospital_posting )) + 
+      geom_bar(fill= "black")
+    ```
+
+4.  Duration of employment
+
+    ```{r}
+    ggplot(data = data2,aes(duration_of_employment))+
+      geom_histogram(fill ="black")
+    ```
+
+5.  Marital status
+
+    ```{r}
+    ggplot(data2, aes(x = marital_status)) + 
+      geom_bar( fill= "black")
+    ```
+
+6.  Previous Experiences Being Bullied
+
+    ```{r}
+    ggplot(data2, aes(x = previous_experience_of_being_bullied )) + 
+      geom_bar(fill="black")
+    ```
+
+7.  Family members spouse
+
+    ```{r}
+    ggplot(data2, aes(x = family_members_spouse  )) + 
+      geom_bar(fill= "black")
+    ```
+
+8.  peers friends
+
+    ```{r}
+    ggplot(data2, aes(x = peers_friends  )) + 
+      geom_bar(fill= "black")
+    ```
+
+### Check Correlation
+
+```{r}
+data3<-
+data2 %>% 
+select(where(is.numeric), -id)
+
+cor.data3 <-
+  cor(data3, use = "complete.obs", method = "pearson")
+head(round(cor.data3,2))
+```
+
+```{r}
+corrplot(cor.data3, method = "circle")
+```
+
+Age has shown moderate correlation with 0.34
+
+# Perform Linear Regression
+
+### Univariable Analysis
+
+In the univariable analysis, we will perform simple linear regression ( SLR) for each of the predictors. We aim to select variables that will be included in the multivariable model. in exploratory research, we want to choose only variables with p-values \<0.25 and clinically significant to be included in the Multivariable Linear Regression ( MLR) model.
+
+1.  Age
+
+    ```{r}
+    sl_age<-lm(literacy_score~age,data = data2)
+    summary(sl_age)
+    tidy(sl_age, conf.int= TRUE)
+    tbl_regression(sl_age)
+    ```
+
+    2.  Gender
+
+    ```{r}
+    sl_gender<-lm(literacy_score~gender ,data = data2)
+    summary(sl_gender)
+    tidy(sl_gender, conf.int= TRUE)
+    tbl_regression(sl_gender)
+    ```
+
+<!-- -->
+
+3.  Current Hospital Posting
+
+    ```{r}
+    sl_currenthospital<-lm(literacy_score~current_hospital_posting ,data = data2)
+    summary(sl_age)
+    tidy(sl_currenthospital, conf.int= TRUE)
+    tbl_regression(sl_currenthospital)
+    ```
+
+4.  Duration of emloyment
+
+    ```{r}
+    sl_duration<-lm(literacy_score~duration_of_employment ,data = data2 )
+    summary(sl_duration)
+    tidy(sl_duration, conf.int= TRUE)
+    tbl_regression(sl_duration)
+    ```
+
+5.  Marital status
+
+    ```{r}
+    sl_marital<-lm(literacy_score~marital_status ,data = data2 )
+    summary(sl_marital)
+    tidy(sl_marital, conf.int= TRUE)
+    tbl_regression(sl_marital)
+    ```
+
+6.  Previous experience of being bully
+
+    ```{r}
+    sl_experience<-lm(literacy_score~previous_experience_of_being_bullied ,data = data2 )
+    summary(sl_experience)
+    tidy(sl_experience, conf.int= TRUE)
+    tbl_regression(sl_experience)
+    ```
+
+7.  Family member spouse
+
+    ```{r}
+    sl_family<-lm(literacy_score~family_members_spouse ,data = data2 )
+    summary(sl_family)
+    tidy(sl_family, conf.int= TRUE)
+    tbl_regression(sl_family)
+    ```
+
+8.  Peers friends
+
+    ```{r}
+    sl_peers<-lm(literacy_score~peers_friends ,data = data2 )
+    summary(sl_peers)
+    tidy(sl_peers, conf.int= TRUE)
+    tbl_regression(sl_peers)
+    ```
+
+```{r}
+rsq(sl_age)
+rsq(sl_currenthospital)
+rsq(sl_duration)
+rsq(sl_experience)
+rsq(sl_family)
+rsq(sl_gender)
+rsq(sl_marital)
+rsq(sl_peers)
+```
+
+Summary Table
+
+```{r}
+#create a summary table for each model with confidence intervals
+tbl_age <- tbl_regression(sl_age, conf.level = 0.95)
+
+tbl_gender <- tbl_regression(sl_gender, conf.level = 0.95)
+
+tbl_currenthospital <- tbl_regression(sl_currenthospital, conf.level = 0.95)
+
+tbl_duration <- tbl_regression(sl_duration, conf.level = 0.95)
+
+tbl_experience <- tbl_regression(sl_experience, conf.level = 0.95)
+
+tbl_family <- tbl_regression(sl_family, conf.level = 0.95)
+
+tbl_marital <- tbl_regression(sl_marital, conf.level = 0.95)
+
+tbl_peers <- tbl_regression(sl_peers, conf.level = 0.95)
+
+
+#Combine all tables into one
+SLR_table <- tbl_stack(
+  list(tbl_age, tbl_peers, tbl_marital, tbl_gender, tbl_family,tbl_experience,tbl_duration,tbl_currenthospital)
+) %>%
+  as_gt() %>%
+  gt::tab_header(
+    title = "Simple Linear Regression Model"
+  )
+
+#Print the summary table
+SLR_table
+```
+
+### Multivariable Analysis
+
+Model 1
+
+```{r}
+mlr_1<-lm(literacy_score~ duration_of_employment + family_members_spouse + 
+    current_hospital_posting + previous_experience_of_being_bullied + peers_friends, data = data2)
+summary(mlr_1)
+rsq(mlr_1)
+```
+
+```{r}
+tidy(mlr_1, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mlr_1) %>%  add_glance_table(include = c(adj.r.squared)) %>% 
+  bold_labels() %>% italicize_levels() %>% 
+  as_gt() %>%
+  gt::tab_header(title = "Table 1. Multiple Linear Regression Model 1",
+                 subtitle = "Without Interaction")
+```
+
+Model 2 with interaction
+
+```{r}
+mlr_2<-lm(literacy_score~ duration_of_employment + family_members_spouse + 
+    current_hospital_posting + previous_experience_of_being_bullied + current_hospital_posting * peers_friends + peers_friends, data = data2)
+summary(mlr_2)
+rsq(mlr_2)
+```
+
+Based on literature review, hospital with good advocates for mental health will likely to have a strong and positive peer support. This insteraction were chosen.
+
+```{r}
+tidy(mlr_2)
+```
+
+```{r}
+tbl_regression(mlr_2) %>%  add_glance_table(include = c(adj.r.squared)) %>% 
+  bold_labels() %>% italicize_levels() %>% add_n() %>% 
+  as_gt() %>%
+  gt::tab_header(title = "Multiple Linear Regression Model",
+                 subtitle = "With Interaction")
+```
+
+### Model Comparison
+
+```{r}
+anova(mlr_1,mlr_2)
+```
+
+Model Assessment We took Model 1 (MLR model without interaction) as our preliminary model
+
+# Assessment of model fitness
+
+```{r}
+prelim.final.m <- lm (literacy_score~ duration_of_employment + family_members_spouse + current_hospital_posting + peers_friends + current_hospital_posting + previous_experience_of_being_bullied, data = data2)
+rsq(prelim.final.m)
+tidy(prelim.final.m)
+```
+
+A diagnostic Plot
+
+```{r}
+plot(prelim.final.m,which=1)
+```
+
+Comment
+
+The red line through the scatter plot straight, horizontal and not curved indicating linearity assumption is satisfied. The homoscedasticity assumption is met as the residuals are equally spread around the y = 0 line.
+
+```{r}
+plot(prelim.final.m,which=2)
+```
+
+In Q-Q plot, Only few data points (observation 13,56 and 39) have large residuals, while other observation lie well along the 45 degree line indicating normality holds
+
+```{r}
+plot(prelim.final.m,which=3)
+```
+
+R flagged observations 13, 56, and 39. Besides that, we do see a horizontal line with randomly scattered data points around it, suggesting that the homoscedasticity assumption is satisfied.
+
+```{r}
+plot(prelim.final.m,which=5)
+```
+
+B.Plot residuals against numerical independent variables (eg : Duration_of_employment) in the model to check for individual linearity. Residual vs Duration of employment
+
+```{r}
+augment(prelim.final.m) %>%
+  ggplot(aes(x = duration_of_employment, y = .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+#Fitted values and residuals We produce diagnostic values to look for outliers or any influential observations within the model.
+
+```{r}
+res.mod <- residuals(prelim.final.m)
+head(res.mod)
+```
+
+```{r}
+hist(res.mod)
+```
+
+Histogram shows normally distributed
+
+# Prediction
+
+```{r}
+data2.pred.res <- augment(prelim.final.m)
+data2.pred.res
+```
+
+## Check for influential
+
+#Testing for Influential Observations Keep standardized residuals between 2 and -2 (values above 2 or lower than −2 considered as influential observations)
+
+```{r}
+non.influen.obs <- 
+  data2.pred.res %>% 
+  filter(.std.resid < 2 & .std.resid > -2 )
+```
+
+Re-run the Model with the non-influential observations (final model)
+
+```{r}
+prelim.final.m2 <- lm (literacy_score~ duration_of_employment + family_members_spouse + current_hospital_posting + previous_experience_of_being_bullied + peers_friends, data = non.influen.obs)
+summary ( prelim.final.m2)
+```
+
+#Model Assumptions for final model 1.Run Diagnostic Plots
+
+```{r}
+plot(prelim.final.m2, which = 1)
+```
+
+Comment
+
+The red line through the scatter plot straight, horizontal and not curved indicating linearity assumption is satisfied. The homoscedasticity assumption is met as the residuals are equally spread around the y = 0 line
+
+```{r}
+plot(prelim.final.m2, which = 2)
+```
+
+Comment
+
+In Q-Q plot, No obvious data point has large residuals, almost all observation lie well along the 45 degree line indicating normality holds
+
+```{r}
+plot(prelim.final.m2, which = 3)
+```
+
+Comment
+
+We do see a horizontal line with randomly scattered data points around it, suggesting that the homoscedasticity assumption is satisfied.
+
+```{r}
+plot(prelim.final.m2, which = 5)
+```
+
+Plot residuals against numerical independent variables (eg : SBP and BMI) in the model to check for individual linearity.
+
+```{r}
+plot(prelim.final.m2, which = 5)
+```
+
+Plot residuals against numerical independent variables (eg : Duration of employement) in the model to check for individual linearity.
+
+```{r}
+augment(prelim.final.m2) %>%
+  ggplot(aes(x =duration_of_employment, y = .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+Comment : Residuals for final model shows individual linearity against duration_of_employment.
+
+Histogram of residual of final model
+
+```{r}
+res.mod_2 <- residuals(prelim.final.m2)
+head(res.mod_2)
+```
+
+```{r}
+hist(res.mod_2)
+```
+
+Comment : Residual of final model appear normally distributed
+
+# Final Model table
+
+```{r}
+tbl_regression(prelim.final.m2) %>%  add_glance_table(include = c(adj.r.squared)) %>% 
+  bold_labels() %>% italicize_levels() %>%
+  as_gt() %>%
+  gt::tab_header(title = "Final Multiple Linear Regression Model")
+```
+
+# Linear Regression Equation
+
+Model Equation
+
+\^Mental Health literacy_score = 98.65 - 0.08 (Duration_of_employment) + 2.1 (HSIP) -0.0.6 (HTM) -0.09 (HUSM) + 1.8 (previous_experience_of_being_bulliedYes) + 1.9 (familymembers_spouseYes) + 1.2 (peers_friendsYes)
+
+# Interpretation
+
+1.  The Ajusted R2 showed 0.041 meaning the model explained 4.2% variability of mental health literacy score among house officer in the study sample after removing the influential residuals.
+2.  For each year increase in duration of employment (or other unit of time), their literacy score slightly decreases by 0.08 points. This might suggest that the longer someone remains in their current employment, perhaps the less they engage in activities that boost their literacy, or it might reflect other life pressures.
+3.  House officer working in HSIP has significantly increase a person's literacy score by 2.1 points, indicating that this Hospital has a positive impact on mental health literacy compared to Hospital Tanah Merah which decrease 0.06 literacy score and Hospital Universiti Sains Malaysia which decrease 0.09 literacy score.
+4.  House officer who has previously experienced being bullied, their literacy score is expected to increase by 1.8 units, relative to someone who has not been bullied, keeping all other factors the same.
+5.  This suggests that having house officer who has family members or a spouse in medical field had increase of 1.9 in the literacy score, compared to not having family members or a spouse involved, other conditions remaining constant.
+6.  House officer having a good peer support had mental health literacy score of increase 1.2 compared to house officer who didnt have peer support, when other varible are controlled
+
+## Github Repo
+
+### Feel free to visit our git hub : <https://github.com/omaralfaruqi/Multiple-Linear-Regression-Group-3.git>
+
+## Thank You
